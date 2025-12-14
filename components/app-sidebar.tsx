@@ -13,6 +13,8 @@ import {
     LayoutDashboard,
     LogOut,
     ChevronUp,
+    Moon,
+    Sun,
 } from "lucide-react";
 
 import {
@@ -31,11 +33,14 @@ import {
     DropdownMenuItem,
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { useTheme } from "next-themes";
+import { Button } from "@/components/ui/button";
 
 export const AppSidebar = () => {
     const router = useRouter();
     const pathname = usePathname();
     const { data: session, isLoading } = useSession();
+    const { theme, setTheme } = useTheme();
 
     if (isLoading || !session?.user) return null;
 
@@ -51,26 +56,40 @@ export const AppSidebar = () => {
         { title: "Settings", url: "/dashboard/settings", icon: Settings },
     ];
 
-    const isActive = (url: string) =>
-        pathname === url || pathname.startsWith(url + "/");
+    const isActive = (url: string) => {
+        if (url === "/dashboard") {
+            return pathname === "/dashboard";
+        }
+        return pathname === url || pathname.startsWith(url + "/");
+    };
 
     return (
         <Sidebar className="border-r border-border">
             {/* ================= Header ================= */}
             <SidebarHeader className="px-4 py-4">
-                <div className="flex items-center gap-3">
-                    <div className="relative h-8 w-8 overflow-hidden rounded-full border">
-                        <Image
-                            src="/baba-logo.jpg"
-                            alt="Code Baba"
-                            fill
-                            sizes="32px"
-                            className="object-cover"
-                        />
+                <div className="flex items-center justify-between w-full">
+                    <div className="flex items-center gap-3">
+                        <div className="relative h-8 w-8 overflow-hidden rounded-full border">
+                            <Image
+                                src="/baba-logo.jpg"
+                                alt="Code Baba"
+                                fill
+                                sizes="32px"
+                                className="object-cover"
+                            />
+                        </div>
+                        <span className="text-sm font-semibold tracking-tight">
+                Code Baba
+              </span>
                     </div>
-                    <span className="text-sm font-semibold tracking-tight">
-            Code Baba
-          </span>
+                    <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+                        className="h-8 w-8 p-0"
+                    >
+                        {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+                    </Button>
                 </div>
             </SidebarHeader>
 
@@ -82,7 +101,7 @@ export const AppSidebar = () => {
                             <SidebarMenuButton asChild isActive={isActive(item.url)}>
                                 <Link
                                     href={item.url}
-                                    className="flex items-center gap-3"
+                                    className={`flex items-center gap-3 ${isActive(item.url) ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground'}`}
                                 >
                                     <item.icon className="h-4 w-4" />
                                     <span>{item.title}</span>
@@ -97,7 +116,7 @@ export const AppSidebar = () => {
             <SidebarFooter className="border-t border-border px-4 py-3">
                 <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                        <button className="flex w-full items-center gap-3 rounded-md px-2 py-2 text-left transition-colors duration-200 hover:bg-white">
+                        <button className="flex w-full items-center gap-3 rounded-md px-2 py-2 text-left transition-colors duration-200 hover:bg-gray-200 dark:hover:bg-gray-700 hover:text-foreground">
                             <div className="relative h-8 w-8 overflow-hidden rounded-full border">
                                 {user.image ? (
                                     <Image

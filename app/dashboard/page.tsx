@@ -3,6 +3,7 @@
 import React from "react";
 import { useQuery } from "@tanstack/react-query";
 import GitHubCalendar from "react-github-contribution-calendar";
+import { useTheme } from "next-themes";
 
 import StatCard from "@/components/dashboard/StatCard";
 import {
@@ -39,6 +40,7 @@ type MonthlyActivity = {
 type ContributionData = Record<string, number>;
 
 const MainPage = () => {
+    const { theme } = useTheme();
     const {
         data: stats,
         isLoading: isStatsLoading,
@@ -56,6 +58,7 @@ const MainPage = () => {
 
             return res.json();
         },
+        staleTime: 5 * 60 * 1000, // 5 minutes
         refetchOnWindowFocus: false,
     });
 
@@ -166,7 +169,7 @@ const MainPage = () => {
                         <GitHubCalendar
                             values={contributionData}
                             until={new Date().toISOString().split('T')[0]}
-                            panelColors={['#ebedf0', '#9be9a8', '#40c463', '#30a14e', '#216e39']}
+                            panelColors={theme === 'dark' ? ['#161b22', '#0e4429', '#006d32', '#26a641', '#39d353'] : ['#ebedf0', '#9be9a8', '#40c463', '#30a14e', '#216e39']}
                         />
                     ) : (
                         <p className="text-sm text-muted-foreground">
