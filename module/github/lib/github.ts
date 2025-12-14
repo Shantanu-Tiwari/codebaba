@@ -1,6 +1,7 @@
 import { Octokit } from "octokit";
 import { auth } from "@/lib/auth";
 import prisma from "@/lib/db";
+import {headers} from "next/headers";
 
 export const getGithubToken = async (
     requestHeaders: Headers
@@ -66,4 +67,38 @@ export async function fetchUserContribution(
         );
         return null;
     }
+}
+
+export const getRepositories = async (requestHeaders: Headers, page: number = 1, perPage: number = 10) => {
+    const token = await getGithubToken(requestHeaders);
+    const octokit = new Octokit({ auth: token });
+
+    const { data } = await octokit.rest.repos.listForAuthenticatedUser({
+        sort: "updated",
+        direction: "desc",
+        visibility: "all",
+        per_page: perPage,
+        page: page
+    });
+    return data;
+}
+
+export const createWebhook = async (requestHeaders: Headers, owner: string, repo:string) => {
+    const token = await getGithubToken(requestHeaders);
+    const octokit = new Octokit({auth:token});
+
+    const webhookUrl = `${process.env.NEXT_PUBLIC_APP_BASE_URL}/api/webhooks/github`
+
+    // Skip checking existing webhooks for faster connection
+    const {data} = await octokit.rest.repos.createWebhook({
+        owner,
+        repo,
+        config:{
+            url:webhookUrl,
+            content_type:"json"
+        },
+        events:["pull_request"]
+    });
+
+    return data;
 }
