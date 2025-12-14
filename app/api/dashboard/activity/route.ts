@@ -1,0 +1,16 @@
+import { getMonthlyActivity } from "@/module/dashboard/action";
+import { NextRequest } from "next/server";
+
+export async function GET(request: NextRequest) {
+    try {
+        const data = await getMonthlyActivity(request.headers);
+        return Response.json(data);
+    } catch (error) {
+        console.error("Dashboard activity API error:", error);
+
+        return new Response(
+            JSON.stringify({ error: "Unauthorized" }),
+            { status: 401 }
+        );
+    }
+}
