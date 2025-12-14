@@ -11,7 +11,6 @@ export async function getDashboardStats(requestHeaders: Headers) {
             headers: requestHeaders,
         });
 
-        // ✅ FIX: correct session shape
         if (!session?.user?.id) {
             throw new Error("Unauthorized");
         }
@@ -19,25 +18,37 @@ export async function getDashboardStats(requestHeaders: Headers) {
         const token = await getGithubToken(requestHeaders);
         const octokit = new Octokit({ auth: token });
 
-        const { data: user } = await octokit.rest.users.getAuthenticated();
-
-        const calendar = await fetchUserContribution(token, user.login);
-        const totalCommits = calendar?.totalContributions ?? 0;
-
-        const { data: prs } = await octokit.rest.search.issuesAndPullRequests({
-            q: `author:${user.login} type:pr`,
-            per_page: 1,
-        });
-
-        const { data: repos } = await octokit.rest.repos.listForAuthenticatedUser({
-            per_page: 100,
-        });
+        // Parallel requests for better performance
+        const [userResponse, calendarData, prsResponse, reposResponse] = await Promise.all([
+            octokit.rest.users.getAuthenticated(),
+            fetchUserContribution(token, ""),
+            octokit.rest.search.issuesAndPullRequests({
+                q: `type:pr author:@me`,
+                per_page: 1,
+            }),
+            (async () => {
+                let allRepos = [];
+                let page = 1;
+                let hasMore = true;
+                
+                while (hasMore) {
+                    const { data: repos } = await octokit.rest.repos.listForAuthenticatedUser({
+                        per_page: 100,
+                        page: page
+                    });
+                    allRepos.push(...repos);
+                    hasMore = repos.length === 100;
+                    page++;
+                }
+                return { data: allRepos };
+            })()
+        ]);
 
         return {
-            totalCommits,
-            totalPRs: prs.total_count,
-            totalReviews: 44, // placeholder
-            totalRepos: repos.length,
+            totalCommits: calendarData?.totalContributions ?? 0,
+            totalPRs: prsResponse.data.total_count,
+            totalReviews: 44,
+            totalRepos: reposResponse.data.length,
         };
     } catch (error) {
         console.error("Error fetching stats:", error);
