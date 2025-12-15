@@ -6,6 +6,7 @@ import {Button} from "@/components/ui/button";
 import {useRepositories} from "@/module/repository/hooks/use-repositories";
 import { ExternalLink } from "lucide-react";
 import {useConnectRepository} from "@/module/repository/hooks/use-connect-repository";
+import { useQueryClient } from "@tanstack/react-query";
 
 interface Repository {
     id:number
@@ -31,8 +32,17 @@ const RepositoryPage = () => {
         isFetchingNextPage
     } = useRepositories()
     const connectRepository = useConnectRepository()
+    const queryClient = useQueryClient()
     const [searchQuery, setSearchQuery] = useState("");
     const [connectingRepoId, setConnectingRepoId] = useState<number | null>(null);
+
+    useEffect(() => {
+        const handleRepoDisconnected = () => {
+            queryClient.invalidateQueries({ queryKey: ["repositories"] })
+        }
+        window.addEventListener('repository-disconnected', handleRepoDisconnected)
+        return () => window.removeEventListener('repository-disconnected', handleRepoDisconnected)
+    }, [queryClient])
     
     const getLanguageColor = (language: string) => {
         const colors: Record<string, string> = {
@@ -76,6 +86,22 @@ const RepositoryPage = () => {
             repo: repoName,
             githubId: repo.id
         }, {
+            onSuccess: () => {
+                // Optimistic update - immediately mark as connected
+                queryClient.setQueryData(["repositories"], (oldData: any) => {
+                    if (!oldData) return oldData;
+                    return {
+                        ...oldData,
+                        pages: oldData.pages.map((page: any) => 
+                            page.map((r: Repository) => 
+                                r.id === repo.id ? { ...r, isConnected: true } : r
+                            )
+                        )
+                    };
+                });
+                // Also trigger refresh for consistency
+                queryClient.invalidateQueries({ queryKey: ["repositories"] })
+            },
             onSettled: () => setConnectingRepoId(null)
         });
     }

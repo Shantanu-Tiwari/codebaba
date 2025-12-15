@@ -63,6 +63,8 @@ const SettingsPage = () => {
             await disconnectRepository(repoId)
             toast.success("Repository disconnected")
             setRepositories(repos => repos.filter(r => r.id !== repoId))
+            // Refresh repositories page data
+            window.dispatchEvent(new Event('repository-disconnected'))
         } catch (error) {
             toast.error("Failed to disconnect repository")
         }
