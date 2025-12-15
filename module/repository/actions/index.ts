@@ -13,18 +13,20 @@ export const fetchRepositories = async (page:number=1, perPage:number=10)=> {
         throw new Error("Unauthorized")
     }
 
-    const githubRepos = await getRepositories(await headers(), page, perPage)
-
-    const dbRepos = await prisma.repository.findMany({
-        where:{
-            userId:session.user.id
-        }
-    });
-    const connectedRepoIds = new Set(dbRepos.map((repo=> repo.githubId)))
+    // Parallel fetch GitHub repos and connected repo IDs
+    const [githubRepos, dbRepos] = await Promise.all([
+        getRepositories(await headers(), page, perPage),
+        prisma.repository.findMany({
+            where: { userId: session.user.id },
+            select: { githubId: true } // Only select needed field
+        })
+    ]);
+    
+    const connectedRepoIds = new Set(dbRepos.map(repo => repo.githubId));
 
     return githubRepos.map((repo:any)=> ({
         ...repo,
-        isConnected:connectedRepoIds.has(BigInt(repo.id))
+        isConnected: connectedRepoIds.has(BigInt(repo.id))
     }))
 }
 
@@ -35,6 +37,18 @@ export const connectRepository = async (owner: string, repo: string, githubId: n
     if (!session) {
         throw new Error("Unauthorized")
     }
+    // Check if already connected
+    const existing = await prisma.repository.findFirst({
+        where: {
+            githubId: BigInt(githubId),
+            userId: session.user.id
+        }
+    });
+    
+    if (existing) {
+        throw new Error("Repository already connected");
+    }
+
     const webhook = await createWebhook(await headers(), owner, repo)
     if (webhook) {
         await prisma.repository.create({
@@ -47,6 +61,8 @@ export const connectRepository = async (owner: string, repo: string, githubId: n
                 userId: session.user.id
             }
         })
+    } else {
+        throw new Error("Failed to create webhook");
     }
 
     try {
