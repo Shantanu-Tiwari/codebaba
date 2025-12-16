@@ -1,6 +1,7 @@
 "use server";
+
 import { auth } from "@/lib/auth";
-import { getRemainingLimits, updateUserTier } from "@/module/payment/lib/subscription";
+import { getRemainingLimits, updateUserTier, type SubscriptionTier, type SubscriptionStatus } from "@/module/payment/lib/subscription";
 import { headers } from "next/headers";
 import { polarClient } from "@/module/payment/config/polar";
 import prisma from "@/lib/db";
@@ -10,13 +11,13 @@ export interface SubscriptionData {
         id: string;
         name: string;
         email: string;
-        subscriptionTier: string;
-        subscriptionStatus: string | null;
+        subscriptionTier: SubscriptionTier;
+        subscriptionStatus: SubscriptionStatus | null;
         polarCustomerId: string | null;
         polarSubscriptionId: string | null;
     } | null;
     limits: {
-        tier: "FREE" | "PRO";
+        tier: SubscriptionTier;
         repositories: {
             current: number;
             limit: number | null;
@@ -50,22 +51,28 @@ export async function getSubscriptionData(): Promise<SubscriptionData> {
             return { user: null, limits: null };
         }
 
-        // Auto-sync subscription status if user has polarCustomerId
+        // Auto-sync subscription status for users with Polar integration
         if (user.polarCustomerId) {
             try {
                 const syncResult = await syncSubscriptionStatus();
-                if (syncResult.success) {
-                    // Refetch user data after sync
-                    const updatedUser = await prisma.user.findUnique({
-                        where: { id: session.user.id }
-                    });
-                    if (updatedUser) {
-                        user.subscriptionTier = updatedUser.subscriptionTier;
-                        user.subscriptionStatus = updatedUser.subscriptionStatus;
+                if (!syncResult.success) {
+                    console.warn("Subscription sync returned:", syncResult.message);
+                }
+                // Refetch updated user data
+                const updatedUser = await prisma.user.findUnique({
+                    where: { id: session.user.id },
+                    select: {
+                        subscriptionTier: true,
+                        subscriptionStatus: true
                     }
+                });
+                if (updatedUser) {
+                    user.subscriptionTier = updatedUser.subscriptionTier;
+                    user.subscriptionStatus = updatedUser.subscriptionStatus;
                 }
             } catch (error) {
-                console.log("Auto-sync failed, continuing with current data");
+                // Continue with existing data if sync fails
+                console.warn("Subscription auto-sync failed:", error);
             }
         }
 
@@ -76,107 +83,110 @@ export async function getSubscriptionData(): Promise<SubscriptionData> {
                 id: user.id,
                 name: user.name,
                 email: user.email,
-                subscriptionTier: user.subscriptionTier || "FREE",
-                subscriptionStatus: user.subscriptionStatus || null,
-                polarCustomerId: user.polarCustomerId || null,
-                polarSubscriptionId: user.polarSubscriptionId || null,
+                subscriptionTier: (user.subscriptionTier as SubscriptionTier) || "FREE",
+                subscriptionStatus: (user.subscriptionStatus as SubscriptionStatus) || null,
+                polarCustomerId: user.polarCustomerId,
+                polarSubscriptionId: user.polarSubscriptionId,
             },
             limits,
         };
     } catch (error) {
-        console.error("Error in getSubscriptionData:", error);
-        throw error;
+        console.error("Failed to fetch subscription data:", error);
+        throw new Error("Unable to retrieve subscription information");
     }
 }
 
+/**
+ * Synchronizes user subscription status with Polar
+ * Automatically links Polar customers and updates subscription tiers
+ */
 export async function syncSubscriptionStatus() {
-    const session = await auth.api.getSession({
-        headers: await headers(),
-    });
+    try {
+        const session = await auth.api.getSession({
+            headers: await headers(),
+        });
 
-    if (!session?.user) {
-        throw new Error("Not authenticated");
-    }
+        if (!session?.user) {
+            return { success: false, message: "Authentication required" };
+        }
 
-    const user = await prisma.user.findUnique({
-        where: { id: session.user.id }
-    });
+        const user = await prisma.user.findUnique({
+            where: { id: session.user.id },
+            select: {
+                id: true,
+                email: true,
+                polarCustomerId: true,
+                subscriptionTier: true
+            }
+        });
 
-    if (!user) {
-        return { success: false, message: "User not found" };
-    }
+        if (!user) {
+            return { success: false, message: "User not found" };
+        }
 
-    console.log("User data:", { 
-        id: user.id, 
-        email: user.email, 
-        polarCustomerId: user.polarCustomerId,
-        subscriptionTier: user.subscriptionTier 
-    });
-
-    if (!user.polarCustomerId) {
-        // Try to find customer by email
-        try {
-            const customers = await polarClient.customers.list({
-                email: user.email
-            });
-            
-            if (customers.result?.items?.length > 0) {
-                const customer = customers.result.items[0];
-                await prisma.user.update({
-                    where: { id: user.id },
-                    data: { polarCustomerId: customer.id }
-                });
-                user.polarCustomerId = customer.id;
-                console.log("Found and linked Polar customer:", customer.id);
-            } else {
+        // Link Polar customer if not already connected
+        if (!user.polarCustomerId) {
+            const customer = await findAndLinkPolarCustomer(user.id, user.email);
+            if (!customer) {
                 return { success: false, message: "No Polar customer found for this email" };
             }
-        } catch (error) {
-            console.error("Error finding customer:", error);
-            return { success: false, message: "Failed to find Polar customer" };
+            user.polarCustomerId = customer;
         }
-    }
 
-    try {
-        // Fetch subscriptions from Polar
+        // Fetch and process user subscriptions
         const result = await polarClient.subscriptions.list({
             customerId: user.polarCustomerId,
         });
 
         const subscriptions = result.result?.items || [];
-
-        // Find the most relevant subscription (active or most recent)
         const activeSub = subscriptions.find((sub: any) => sub.status === 'active');
         const latestSub = subscriptions[0];
 
         if (activeSub) {
             await updateUserTier(user.id, "PRO", "ACTIVE", activeSub.id);
             return { success: true, status: "ACTIVE" };
-        } else if (latestSub) {
-            // If latest is canceled/expired
+        } 
+        
+        if (latestSub) {
             const status = latestSub.status === 'canceled' ? 'CANCELED' : 'EXPIRED';
-            await updateUserTier(user.id, "FREE", status, latestSub.id);
+            await updateUserTier(user.id, "FREE", status as SubscriptionStatus, latestSub.id);
             return { success: true, status };
         }
 
-        // No subscriptions found - downgrade to FREE
+        // No subscriptions found - set to FREE tier
         await updateUserTier(user.id, "FREE", "EXPIRED");
         return { success: true, status: "NO_SUBSCRIPTION" };
+        
     } catch (error) {
-        console.error("Failed to sync subscription:", error);
-        return { success: false, error: "Failed to sync with Polar" };
+        console.error("Subscription sync failed:", error);
+        return { success: false, error: "Failed to sync subscription status" };
     }
 }
 
-export async function manualUpgradeToProForTesting() {
-    const session = await auth.api.getSession({
-        headers: await headers(),
-    });
-
-    if (!session?.user) {
-        throw new Error("Not authenticated");
+/**
+ * Finds and links a Polar customer to the user account
+ */
+async function findAndLinkPolarCustomer(userId: string, email: string): Promise<string | null> {
+    try {
+        const customers = await polarClient.customers.list({ email });
+        
+        if (customers.result?.items?.length > 0) {
+            const customer = customers.result.items[0];
+            await prisma.user.update({
+                where: { id: userId },
+                data: { polarCustomerId: customer.id }
+            });
+            return customer.id;
+        }
+        
+        return null;
+    } catch (error) {
+        console.error("Failed to find Polar customer:", error);
+        return null;
     }
-
-    await updateUserTier(session.user.id, "PRO", "ACTIVE");
-    return { success: true, message: "Manually upgraded to Pro for testing" };
 }
+
+/**
+ * Retrieves comprehensive subscription data for the authenticated user
+ * Includes user information, subscription status, and usage limits
+ */
