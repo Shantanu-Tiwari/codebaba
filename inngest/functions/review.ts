@@ -1,63 +1,66 @@
 import { inngest } from "../client";
-import { getPullRequestDiff, postReviewComment } from "@/module/github/lib/github";
+import {
+  getPullRequestDiff,
+  postReviewComment,
+} from "@/module/github/lib/github";
 import { retrieveContext } from "@/module/ai/lib/rag";
 import { generateText } from "ai";
 import { google } from "@ai-sdk/google";
 import prisma from "@/lib/db";
 
 export const generateReview = inngest.createFunction(
-    { id: "generate-review", concurrency: 5 },
-    { event: "pr.review.requested" },
+  { id: "generate-review", concurrency: 5 },
+  { event: "pr.review.requested" },
 
-    async ({ event, step }) => {
-        const { owner, repo, prNumber, userId } = event.data;
+  async ({ event, step }) => {
+    const { owner, repo, prNumber, userId } = event.data;
 
-        /**
-         * 1. Fetch PR data + GitHub token
-         */
-        const { diff, title, description, token } = await step.run(
-            "fetch-pr-data",
-            async () => {
-                const account = await prisma.account.findFirst({
-                    where: {
-                        userId,
-                        providerId: "github",
-                    },
-                });
-
-                if (!account?.accessToken) {
-                    throw new Error("No GitHub access token found for user");
-                }
-
-                const prData = await getPullRequestDiff(
-                    account.accessToken,
-                    owner,
-                    repo,
-                    prNumber
-                );
-
-                return {
-                    ...prData,
-                    token: account.accessToken,
-                };
-            }
-        );
-
-        /**
-         * 2. Retrieve semantic context from codebase (RAG)
-         */
-        const context = await step.run("retrieve-context", async () => {
-            const query = `${title}\n${description || ""}`;
-            return retrieveContext(query, `${owner}/${repo}`);
+    /**
+     * 1. Fetch PR data + GitHub token
+     */
+    const { diff, title, description, token } = await step.run(
+      "fetch-pr-data",
+      async () => {
+        const account = await prisma.account.findFirst({
+          where: {
+            userId,
+            providerId: "github",
+          },
         });
 
-        // Skip duplicate check for now
+        if (!account?.accessToken) {
+          throw new Error("No GitHub access token found for user");
+        }
 
-        /**
-         * 4. Generate AI review
-         */
-        const review = await step.run("generate-ai-review", async () => {
-            const prompt = `
+        const prData = await getPullRequestDiff(
+          account.accessToken,
+          owner,
+          repo,
+          prNumber
+        );
+
+        return {
+          ...prData,
+          token: account.accessToken,
+        };
+      }
+    );
+
+    /**
+     * 2. Retrieve semantic context from codebase (RAG)
+     */
+    const context = await step.run("retrieve-context", async () => {
+      const query = `${title}\n${description || ""}`;
+      return retrieveContext(query, `${owner}/${repo}`);
+    });
+
+    // Skip duplicate check for now
+
+    /**
+     * 4. Generate AI review
+     */
+    const review = await step.run("generate-ai-review", async () => {
+      const prompt = `
 You are a senior software engineer reviewing production code. Focus on **security, functionality, and critical issues**.
 
 ## Code Changes
@@ -114,45 +117,45 @@ ${context.join("\n\n")}
 
 Focus on **actionable feedback** with specific file references and line numbers where applicable.`;
 
-            const { text } = await generateText({
-                model: google("gemini-2.5-flash"),
-                prompt,
-                maxTokens: 2000,
-                temperature: 0.3
-            });
+      const { text } = await generateText({
+        model: google("gemini-2.5-flash"),
+        prompt,
+        maxOutputTokens: 2000,
+        temperature: 0.3,
+      });
 
-            return text;
-        });
+      return text;
+    });
 
-        /**
-         * 5. Post review as PR comment
-         */
-        await step.run("post-review-comment", async () => {
-            await postReviewComment(token, owner, repo, prNumber, review);
-        });
+    /**
+     * 5. Post review as PR comment
+     */
+    await step.run("post-review-comment", async () => {
+      await postReviewComment(token, owner, repo, prNumber, review);
+    });
 
-        /**
-         * 6. Persist review for analytics / dashboard / billing
-         */
-        await step.run("save-review", async () => {
-            const repository = await prisma.repository.findFirst({
-                where: { owner, name: repo },
-            });
+    /**
+     * 6. Persist review for analytics / dashboard / billing
+     */
+    await step.run("save-review", async () => {
+      const repository = await prisma.repository.findFirst({
+        where: { owner, name: repo },
+      });
 
-            if (!repository) return;
+      if (!repository) return;
 
-            await prisma.review.create({
-                data: {
-                    repositoryId: repository.id,
-                    prNumber,
-                    prTitle: title,
-                    prUrl: `https://github.com/${owner}/${repo}/pull/${prNumber}`,
-                    review,
-                    status: "completed",
-                },
-            });
-        });
+      await prisma.review.create({
+        data: {
+          repositoryId: repository.id,
+          prNumber,
+          prTitle: title,
+          prUrl: `https://github.com/${owner}/${repo}/pull/${prNumber}`,
+          review,
+          status: "completed",
+        },
+      });
+    });
 
-        return { success: true };
-    }
+    return { success: true };
+  }
 );

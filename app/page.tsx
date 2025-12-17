@@ -1,11 +1,5 @@
-import Image from "next/image";
-import {Button} from "@/components/ui/button";
-import {requireUnauth} from "@/module/auth/utils/auth-utils";
+import { redirect } from "next/navigation";
 
-export default async function Home() {
-    await requireUnauth()
-    return (
-
-    <Button>Hello</Button>
-      );
+export default function Home() {
+  redirect("/login");
 }
