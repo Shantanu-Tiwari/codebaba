@@ -56,6 +56,7 @@ export async function reviewPullRequest(
     );
 
     await inngest.send({
+      id: `pr-review-${owner}-${repo}-${prNumber}-${Date.now()}`,
       name: "pr.review.requested",
       data: {
         owner,
@@ -64,6 +65,7 @@ export async function reviewPullRequest(
         userId: repository.user.id,
       },
     });
+
 
     await incrementReviewCount(repository.user.id, repository.id);
     return { success: true, message: "Review Queued" };
