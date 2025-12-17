@@ -1,4 +1,4 @@
-import { inngest } from "../client";
+import { inngest } from "@/inngest/client";
 import {
   getPullRequestDiff,
   postReviewComment,
@@ -51,7 +51,7 @@ export const generateReview = inngest.createFunction(
      */
     const context = await step.run("retrieve-context", async () => {
       const query = `${title}\n${description || ""}`;
-      return retrieveContext(query, `${owner}/${repo}`);
+      return retrieveContext(query, `${owner}/${repo}`, 3);
     });
 
     // Skip duplicate check for now
@@ -60,12 +60,13 @@ export const generateReview = inngest.createFunction(
      * 4. Generate AI review
      */
     const review = await step.run("generate-ai-review", async () => {
+      const truncatedDiff = diff.length > 10000 ? diff.slice(0, 10000) + "\n... (truncated)" : diff;
       const prompt = `
 You are a senior software engineer reviewing production code. Focus on **security, functionality, and critical issues**.
 
 ## Code Changes
 \`\`\`diff
-${diff}
+${truncatedDiff}
 \`\`\`
 
 ## Codebase Context
@@ -120,7 +121,7 @@ Focus on **actionable feedback** with specific file references and line numbers 
       const { text } = await generateText({
         model: google("gemini-2.5-flash"),
         prompt,
-        maxOutputTokens: 2000,
+        maxOutputTokens: 1500,
         temperature: 0.3,
       });
 
