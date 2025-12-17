@@ -40,7 +40,7 @@ type MonthlyActivity = {
 type ContributionData = Record<string, number>;
 
 const MainPage = () => {
-  const { theme } = useTheme();
+  const { resolvedTheme } = useTheme();
   const {
     data: stats,
     isLoading: isStatsLoading,
@@ -168,13 +168,14 @@ const MainPage = () => {
               values={contributionData}
               until={new Date().toISOString().split("T")[0]}
               panelColors={
-                theme === "dark"
+                resolvedTheme === "dark"
                   ? ["#161b22", "#0e4429", "#006d32", "#26a641", "#39d353"]
                   : ["#ebedf0", "#9be9a8", "#40c463", "#30a14e", "#216e39"]
               }
               weekLabelAttributes={{}}
               monthLabelAttributes={{}}
               panelAttributes={{}}
+              key={resolvedTheme}
             />
           ) : (
             <p className="text-sm text-muted-foreground">
