@@ -1,7 +1,7 @@
 "use server";
 
+// Webhook test v2 - Testing with new domain
 import prisma from "@/lib/db";
-import { getPullRequestDiff } from "@/module/github/lib/github";
 import { inngest } from "@/inngest/client";
 import {
   canCreateReview,
@@ -13,7 +13,9 @@ export async function reviewPullRequest(
   repo: string,
   prNumber: number
 ) {
+  console.log(`Starting review process for ${owner}/${repo} #${prNumber}`);
   try {
+    console.log(`Looking for repository ${owner}/${repo}`);
     const repository = await prisma.repository.findFirst({
       where: {
         owner,
@@ -31,6 +33,7 @@ export async function reviewPullRequest(
         },
       },
     });
+    console.log("Repository found:", !!repository);
     if (!repository) {
       throw new Error(
         `Repository ${owner}/${repo} not found in database. Please reconnect the repository.`
@@ -43,17 +46,6 @@ export async function reviewPullRequest(
         "Review limit reached for this repository, Please upgrade to Pro for unlimited reviews."
       );
     }
-    const githubAccount = repository.user.accounts[0];
-    if (!githubAccount?.accessToken) {
-      throw new Error("No Github access token found for repository owner");
-    }
-    const token = githubAccount.accessToken;
-    const { title } = await getPullRequestDiff(
-      token,
-      owner,
-      repo,
-      prNumber.toString()
-    );
 
     console.log("Sending inngest event for PR review:", {
       owner,
@@ -62,7 +54,9 @@ export async function reviewPullRequest(
       userId: repository.user.id,
     });
     try {
-      await inngest.send({
+      console.log(`Sending inngest event for ${owner}/${repo} #${prNumber}`);
+      console.log("Inngest client:", inngest);
+      const result = await inngest.send({
         id: `pr-review-${owner}-${repo}-${prNumber}-${Date.now()}`,
         name: "pr.review.requested",
         data: {
@@ -72,6 +66,7 @@ export async function reviewPullRequest(
           userId: repository.user.id,
         },
       });
+      console.log("Inngest send result:", result);
       console.log("Inngest event sent successfully");
     } catch (sendError) {
       console.error("Failed to send inngest event:", sendError);

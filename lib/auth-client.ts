@@ -3,6 +3,6 @@ import { polarClient } from "@polar-sh/better-auth";
 
 export const { signIn, signUp, useSession, signOut, customer, checkout } =
   createAuthClient({
-    baseURL: process.env.NEXT_PUBLIC_BETTER_AUTH_URL || "http://localhost:3000",
+    baseURL: process.env.NEXT_PUBLIC_BETTER_AUTH_URL || "",
     plugins: [polarClient()],
   });
