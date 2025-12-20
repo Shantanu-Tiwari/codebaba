@@ -4,6 +4,7 @@ import "./globals.css";
 import {ThemeProvider} from "@/components/providers/theme-providers";
 import {QueryProvider} from "@/components/providers/query-provider";
 import { Toaster } from "sonner";
+import { Analytics } from "@vercel/analytics/next";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -50,6 +51,7 @@ export default function RootLayout({
               },
             }}
           />
+          <Analytics />
       </ThemeProvider>
       </QueryProvider>
 

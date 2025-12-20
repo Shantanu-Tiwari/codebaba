@@ -20,6 +20,11 @@ model User {
   accounts      Account[]
   repositories  Repository[]
 
+  usage UserUsage?
+  subscriptionTier String @default("Free")
+  subscriptionStatus String? //ACTIVE, CANCELLED, EXPIRED
+  polarCustomerId String?   @unique
+  polarSubscriptionId String?   @unique
   @@unique([email])
   @@map("user")
 }
@@ -54,6 +59,16 @@ updatedAt DateTime @updatedAt
 
 @@index([repositoryId])
 @@map("review")
+}
+
+model UserUsage {
+id String @id @default(cuid())
+userId String @unique
+user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+repositoryCount Int @default (0)
+reviewCounts Json @default("{}")
+createdAt DateTime @updatedAt
+@@map("user_usage")
 }
 
 model Session {
