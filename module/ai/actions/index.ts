@@ -1,6 +1,6 @@
 "use server";
 
-// Test webhook integration - PR test
+// Webhook test v2 - Testing with new domain
 import prisma from "@/lib/db";
 import { getPullRequestDiff } from "@/module/github/lib/github";
 import { inngest } from "@/inngest/client";
