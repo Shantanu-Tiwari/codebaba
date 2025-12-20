@@ -15,7 +15,13 @@ import {
 } from "@/module/payment/lib/subscription";
 
 export const auth = betterAuth({
-  baseURL: "https://www.codebaba.in",
+  baseURL: process.env.BETTER_AUTH_URL || "http://localhost:3000",
+  trustedOrigins: [
+    "https://www.codebaba.in",
+    "https://codebaba.in",
+    "http://localhost:3000",
+    "http://localhost:3001",
+  ],
   database: prismaAdapter(prisma, {
     provider: "postgresql",
   }),
@@ -26,9 +32,6 @@ export const auth = betterAuth({
       scope: ["repo"],
     },
   },
-  trustedOrigins: process.env.TRUSTED_ORIGIN
-    ? [process.env.TRUSTED_ORIGIN]
-    : [],
   plugins: [
     polar({
       client: polarClient,
