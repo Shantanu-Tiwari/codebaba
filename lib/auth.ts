@@ -113,4 +113,3 @@ export const auth = betterAuth({
     }),
   ],
 });
-});
