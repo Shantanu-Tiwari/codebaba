@@ -15,20 +15,23 @@ import {
 } from "@/module/payment/lib/subscription";
 
 export const auth = betterAuth({
+  baseURL: process.env.BETTER_AUTH_URL || "http://localhost:3000",
+  trustedOrigins: [
+    "https://www.codebaba.in",
+    "https://codebaba.in",
+    "http://localhost:3000",
+    "http://localhost:3001",
+  ],
   database: prismaAdapter(prisma, {
     provider: "postgresql",
   }),
-  baseURL: process.env.NEXT_PUBLIC_APP_BASE_URL,
   socialProviders: {
     github: {
       clientId: process.env.GITHUB_CLIENT_ID!,
-      clientSecret: process.env.GITHUB_CLIENT_SECRET,
+      clientSecret: process.env.GITHUB_CLIENT_SECRET!,
       scope: ["repo"],
     },
   },
-  trustedOrigins: process.env.TRUSTED_ORIGIN
-    ? [process.env.TRUSTED_ORIGIN]
-    : [],
   plugins: [
     polar({
       client: polarClient,
