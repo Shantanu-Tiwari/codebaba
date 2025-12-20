@@ -92,9 +92,41 @@ export const createWebhook = async (
   const token = await getGithubToken(requestHeaders);
   const octokit = new Octokit({ auth: token });
 
-  const webhookUrl = `${process.env.NEXT_PUBLIC_APP_BASE_URL}/api/webhooks/github`;
+  const webhookUrl = `https://www.codebaba.in/api/webhooks/github`;
+  const oldWebhookUrl = `${process.env.NEXT_PUBLIC_APP_BASE_URL}/api/webhooks/github`;
 
-  // Skip checking existing webhooks for faster connection
+  // Check for existing webhooks and update if necessary
+  const { data: hooks } = await octokit.rest.repos.listWebhooks({
+    owner,
+    repo,
+  });
+
+  const existingHook = hooks.find(
+    (hook) =>
+      hook.config.url === oldWebhookUrl || hook.config.url === webhookUrl
+  );
+
+  if (existingHook) {
+    if (existingHook.config.url !== webhookUrl) {
+      // Update the webhook URL
+      const { data } = await octokit.rest.repos.updateWebhook({
+        owner,
+        repo,
+        hook_id: existingHook.id,
+        config: {
+          url: webhookUrl,
+          content_type: "json",
+        },
+        events: ["pull_request"],
+      });
+      return data;
+    } else {
+      // Webhook already correct
+      return existingHook;
+    }
+  }
+
+  // Create new webhook
   const { data } = await octokit.rest.repos.createWebhook({
     owner,
     repo,
@@ -115,13 +147,17 @@ export const deleteWebhook = async (
 ) => {
   const token = await getGithubToken(requestHeaders);
   const octokit = new Octokit({ auth: token });
-  const webhookUrl = `${process.env.NEXT_PUBLIC_APP_BASE_URL}/api/webhooks/github`;
+  const webhookUrl = `https://www.codebaba.in/api/webhooks/github`;
+  const oldWebhookUrl = `${process.env.NEXT_PUBLIC_APP_BASE_URL}/api/webhooks/github`;
   try {
     const { data: hooks } = await octokit.rest.repos.listWebhooks({
       owner,
       repo,
     });
-    const hookToDelete = hooks.find((hook) => hook.config.url === webhookUrl);
+    const hookToDelete = hooks.find(
+      (hook) =>
+        hook.config.url === webhookUrl || hook.config.url === oldWebhookUrl
+    );
     if (hookToDelete) {
       await octokit.rest.repos.deleteWebhook({
         owner,

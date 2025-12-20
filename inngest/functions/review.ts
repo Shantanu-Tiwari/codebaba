@@ -64,7 +64,7 @@ export const generateReview = inngest.createFunction(
     /**
      * 4. Generate AI review
      */
-    const review = await step.run("generate-ai-review", async () => {
+    const review: string = await step.run("generate-ai-review", async () => {
       const truncatedDiff =
         (diff as string).length > 10000
           ? (diff as string).slice(0, 10000) + "\n... (truncated)"
@@ -140,7 +140,7 @@ Focus on **actionable feedback** with specific file references and line numbers 
      * 5. Post review as PR comment
      */
     await step.run("post-review-comment", async () => {
-      await postReviewComment(token, owner, repo, prNumber, review as string);
+      await postReviewComment(token, owner, repo, prNumber, review);
     });
 
     /**
