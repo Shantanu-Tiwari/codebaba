@@ -55,7 +55,12 @@ export async function reviewPullRequest(
       prNumber.toString()
     );
 
-    console.log("Sending inngest event for PR review:", { owner, repo, prNumber, userId: repository.user.id });
+    console.log("Sending inngest event for PR review:", {
+      owner,
+      repo,
+      prNumber,
+      userId: repository.user.id,
+    });
     try {
       await inngest.send({
         id: `pr-review-${owner}-${repo}-${prNumber}-${Date.now()}`,
@@ -72,7 +77,6 @@ export async function reviewPullRequest(
       console.error("Failed to send inngest event:", sendError);
       throw sendError;
     }
-
 
     await incrementReviewCount(repository.user.id, repository.id);
     return { success: true, message: "Review Queued" };
