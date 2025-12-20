@@ -16,6 +16,7 @@ export async function reviewPullRequest(
   console.log(`Starting review process for ${owner}/${repo} #${prNumber}`);
   try {
     console.log(`Looking for repository ${owner}/${repo}`);
+    console.log("About to query prisma");
     const repository = await prisma.repository.findFirst({
       where: {
         owner,

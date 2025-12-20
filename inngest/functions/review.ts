@@ -64,9 +64,11 @@ export const generateReview = inngest.createFunction(
     /**
      * 4. Generate AI review
      */
-    const review = await step.run("generate-ai-review", async () => {
+    const review: string = await step.run("generate-ai-review", async () => {
       const truncatedDiff =
-        diff.length > 10000 ? diff.slice(0, 10000) + "\n... (truncated)" : diff;
+        (diff as string).length > 10000
+          ? (diff as string).slice(0, 10000) + "\n... (truncated)"
+          : (diff as string);
       const prompt = `
 You are a senior software engineer reviewing production code. Focus on **security, functionality, and critical issues**.
 

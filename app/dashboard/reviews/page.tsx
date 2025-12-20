@@ -29,6 +29,10 @@ interface Review {
   };
 }
 
+interface RawReview extends Omit<Review, "createdAt"> {
+  createdAt: Date;
+}
+
 const ReviewsPage = () => {
   const [searchQuery, setSearchQuery] = useState("");
 
@@ -38,9 +42,9 @@ const ReviewsPage = () => {
     error,
   } = useQuery<Review[]>({
     queryKey: ["reviews"],
-    queryFn: async () => {
+    queryFn: async (): Promise<Review[]> => {
       const data = await getReviews();
-      return data.map((review) => ({
+      return data.map((review: RawReview) => ({
         ...review,
         createdAt: review.createdAt.toISOString(),
       }));
