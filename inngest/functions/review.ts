@@ -13,6 +13,11 @@ export const generateReview = inngest.createFunction(
   { event: "pr.review.requested" },
 
   async ({ event, step }) => {
+    console.log("Inngest function generateReview started");
+    console.log("Event data:", event.data);
+    console.log(
+      `Inngest function triggered for ${event.data.owner}/${event.data.repo} #${event.data.prNumber}`
+    );
     const { owner, repo, prNumber, userId } = event.data;
 
     /**
@@ -60,7 +65,8 @@ export const generateReview = inngest.createFunction(
      * 4. Generate AI review
      */
     const review = await step.run("generate-ai-review", async () => {
-      const truncatedDiff = diff.length > 10000 ? diff.slice(0, 10000) + "\n... (truncated)" : diff;
+      const truncatedDiff =
+        diff.length > 10000 ? diff.slice(0, 10000) + "\n... (truncated)" : diff;
       const prompt = `
 You are a senior software engineer reviewing production code. Focus on **security, functionality, and critical issues**.
 
