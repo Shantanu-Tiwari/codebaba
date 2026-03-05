@@ -25,7 +25,7 @@ export const generateReview = inngest.createFunction(
      */
     const { diff, title, description, token } = await step.run(
       "fetch-pr-data",
-      async () => {
+      async (): Promise<{ diff: string; title: string; description: string; token: string }> => {
         const account = await prisma.account.findFirst({
           where: {
             userId,
