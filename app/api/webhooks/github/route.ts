@@ -1,7 +1,7 @@
-import {NextRequest, NextResponse} from "next/server";
-import {reviewPullRequest} from "@/module/ai/actions";
+import { NextRequest, NextResponse } from "next/server";
+import { reviewPullRequest } from "@/module/ai/actions";
 
-export async function POST(req:NextRequest){
+export async function POST(req: NextRequest) {
     try {
         console.log("Webhook received:", req.headers.get("x-github-event"));
         const body = await req.json();
@@ -9,7 +9,7 @@ export async function POST(req:NextRequest){
 
         if (event === "ping") {
             console.log("Ping received from GitHub");
-            return NextResponse.json({message:"pong"}, {status:200})
+            return NextResponse.json({ message: "pong" }, { status: 200 })
         }
 
         if (event === "pull_request") {
@@ -23,16 +23,19 @@ export async function POST(req:NextRequest){
 
             if (action === "opened" || action === "synchronize") {
                 console.log(`Triggering review for ${repo} #${prNumber}`);
-                reviewPullRequest(owner, repoName, prNumber)
-                    .then((result) => console.log(`Review queued for ${repo} #${prNumber}:`, result))
-                    .catch((error) => console.log(`Review failed for ${repo} #${prNumber}: `, error))
+                try {
+                    const result = await reviewPullRequest(owner, repoName, prNumber);
+                    console.log(`Review queued for ${repo} #${prNumber}:`, result);
+                } catch (error) {
+                    console.error(`Review failed for ${repo} #${prNumber}: `, error);
+                }
             }
         }
-        
+
         console.log("GitHub event:", event, body);
-        return NextResponse.json({message: "Event Processed"}, {status: 200})
+        return NextResponse.json({ message: "Event Processed" }, { status: 200 })
     } catch (error) {
         console.error("Error processing webhook: ", error);
-        return NextResponse.json({error: "Internal Server Error"}, {status:500});
+        return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
     }
 }
