@@ -15,7 +15,12 @@ import {
 } from "@/module/payment/lib/subscription";
 
 export const auth = betterAuth({
-  baseURL: process.env.BETTER_AUTH_URL || "http://localhost:3000",
+  secret: process.env.BETTER_AUTH_SECRET,
+  baseURL:
+    process.env.BETTER_AUTH_URL ||
+    (process.env.NODE_ENV === "production"
+      ? "https://www.codebaba.in"
+      : "http://localhost:3000"),
   trustedOrigins: [
     "https://www.codebaba.in",
     "https://codebaba.in",
