@@ -70,7 +70,7 @@ export default function SubscriptionPage() {
             await checkout({
                 slug: process.env.NEXT_PUBLIC_POLAR_PRODUCT_ID,
                 successUrl: `${window.location.origin}/dashboard/subscription?success=true`,
-                cancelUrl: `${window.location.origin}/dashboard/subscription`
+                returnUrl: `${window.location.origin}/dashboard/subscription`
             });
         } catch (error) {
             console.error("Checkout error:", error);

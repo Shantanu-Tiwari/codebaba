@@ -102,6 +102,7 @@ export const auth = betterAuth({
           },
           onOrderPaid: async () => {},
           onCustomerCreated: async (payload) => {
+            if (!payload.data.email) return;
             const user = await prisma.user.findUnique({
               where: {
                 email: payload.data.email,
