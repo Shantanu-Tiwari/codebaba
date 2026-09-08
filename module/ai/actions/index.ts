@@ -5,7 +5,6 @@ import prisma from "@/lib/db";
 import { inngest } from "@/inngest/client";
 import {
   canCreateReview,
-  incrementReviewCount,
 } from "@/module/payment/lib/subscription";
 
 export async function reviewPullRequest(
@@ -65,6 +64,7 @@ export async function reviewPullRequest(
           repo,
           prNumber,
           userId: repository.user.id,
+          repositoryId: repository.id,
         },
       });
       console.log("Inngest send result:", result);
@@ -74,7 +74,6 @@ export async function reviewPullRequest(
       throw sendError;
     }
 
-    await incrementReviewCount(repository.user.id, repository.id);
     return { success: true, message: "Review Queued" };
   } catch (error) {
     try {
@@ -87,7 +86,7 @@ export async function reviewPullRequest(
             repositoryId: repository.id,
             prNumber,
             prTitle: "Failed to fetch PR",
-            prUrl: `https://github.com/${owner}/pull/${prNumber}`,
+            prUrl: `https://github.com/${owner}/${repo}/pull/${prNumber}`,
             review: `Error: ${
               error instanceof Error ? error.message : "Unknown Error"
             }`,
@@ -98,5 +97,9 @@ export async function reviewPullRequest(
     } catch (dberror) {
       console.error("Failed to save error to database: ", dberror);
     }
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Unknown Error",
+    };
   }
 }

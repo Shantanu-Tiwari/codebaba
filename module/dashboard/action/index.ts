@@ -1,6 +1,7 @@
 import { fetchUserContribution, getGithubToken } from "@/module/github/lib/github";
 import { auth } from "@/lib/auth";
 import { Octokit } from "octokit";
+import prisma from "@/lib/db";
 
 /**
  * Dashboard summary stats
@@ -44,10 +45,18 @@ export async function getDashboardStats(requestHeaders: Headers) {
             })()
         ]);
 
+        const reviewCount = await prisma.review.count({
+            where: {
+                repository: {
+                    userId: session.user.id,
+                },
+            },
+        });
+
         return {
             totalCommits: calendarData?.totalContributions ?? 0,
             totalPRs: prsResponse.data.total_count,
-            totalReviews: 44,
+            totalReviews: reviewCount,
             totalRepos: reposResponse.data.length,
         };
     } catch (error) {
@@ -147,22 +156,23 @@ export async function getMonthlyActivity(requestHeaders: Headers) {
             });
         });
 
-        // Placeholder reviews
-        const generateSampleReviews = () => {
-            const reviews: { createdAt: Date }[] = [];
-            const now = new Date();
+        // Real reviews from the database
+        const sixMonthsAgoDate = new Date();
+        sixMonthsAgoDate.setMonth(sixMonthsAgoDate.getMonth() - 6);
 
-            for (let i = 0; i < 45; i++) {
-                const daysAgo = Math.floor(Math.random() * 180);
-                const reviewDate = new Date(now);
-                reviewDate.setDate(reviewDate.getDate() - daysAgo);
-                reviews.push({ createdAt: reviewDate });
-            }
+        const reviews = await prisma.review.findMany({
+            where: {
+                repository: {
+                    userId: session.user.id,
+                },
+                createdAt: {
+                    gte: sixMonthsAgoDate,
+                },
+            },
+            select: { createdAt: true },
+        });
 
-            return reviews;
-        };
-
-        generateSampleReviews().forEach((review) => {
+        reviews.forEach((review: { createdAt: Date }) => {
             const monthKey = monthNames[review.createdAt.getMonth()];
             if (monthlyData[monthKey]) {
                 monthlyData[monthKey].reviews += 1;

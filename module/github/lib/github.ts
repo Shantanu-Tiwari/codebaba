@@ -231,19 +231,19 @@ export async function getPullRequestDiff(
   token: string,
   owner: string,
   repo: string,
-  prNumber: string
+  prNumber: number
 ) {
   const octokit = new Octokit({ auth: token });
 
   const { data: pr } = await octokit.rest.pulls.get({
     owner,
     repo,
-    pull_number: Number(prNumber),
+    pull_number: prNumber,
   });
   const { data: diff } = await octokit.rest.pulls.get({
     owner,
     repo,
-    pull_number: Number(prNumber),
+    pull_number: prNumber,
     mediaType: {
       format: "diff",
     },

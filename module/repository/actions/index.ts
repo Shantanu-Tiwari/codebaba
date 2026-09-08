@@ -64,7 +64,7 @@ export const connectRepository = async (owner: string, repo: string, githubId: n
                 name: repo,
                 owner,
                 fullName: `${owner}/${repo}`,
-                url: `http://github.com/${owner}/${repo}`,
+                url: `https://github.com/${owner}/${repo}`,
                 userId: session.user.id
             }
         })

@@ -7,6 +7,7 @@ import { retrieveContext } from "@/module/ai/lib/rag";
 import { generateText } from "ai";
 import { google } from "@ai-sdk/google";
 import prisma from "@/lib/db";
+import { incrementReviewCount } from "@/module/payment/lib/subscription";
 
 export const generateReview = inngest.createFunction(
   { id: "generate-review", concurrency: 5 },
@@ -18,7 +19,7 @@ export const generateReview = inngest.createFunction(
     console.log(
       `Inngest function triggered for ${event.data.owner}/${event.data.repo} #${event.data.prNumber}`
     );
-    const { owner, repo, prNumber, userId } = event.data;
+    const { owner, repo, prNumber, userId, repositoryId } = event.data;
 
     /**
      * 1. Fetch PR data + GitHub token
@@ -147,15 +148,15 @@ Focus on **actionable feedback** with specific file references and line numbers 
      * 6. Persist review for analytics / dashboard / billing
      */
     await step.run("save-review", async () => {
-      const repository = await prisma.repository.findFirst({
+      const repoId = repositoryId || (await prisma.repository.findFirst({
         where: { owner, name: repo },
-      });
+      }))?.id;
 
-      if (!repository) return;
+      if (!repoId) return;
 
       await prisma.review.create({
         data: {
-          repositoryId: repository.id,
+          repositoryId: repoId,
           prNumber,
           prTitle: title,
           prUrl: `https://github.com/${owner}/${repo}/pull/${prNumber}`,
@@ -163,6 +164,8 @@ Focus on **actionable feedback** with specific file references and line numbers 
           status: "completed",
         },
       });
+
+      await incrementReviewCount(userId, repoId);
     });
 
     return { success: true };

@@ -67,7 +67,8 @@ userId String @unique
 user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 repositoryCount Int @default (0)
 reviewCounts Json @default("{}")
-createdAt DateTime @updatedAt
+createdAt DateTime @default(now())
+updatedAt DateTime @updatedAt
 @@map("user_usage")
 }
 
